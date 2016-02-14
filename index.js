@@ -23,7 +23,7 @@ app.get('/', function(req, res){
 	res.render('home');
 });
 
-// 
+// 模块名称前添加 ./表示到上级目录中去查找
 var fortunes=require('./libs/fortune.js');
 app.get('/about', function(req, res){
 	// res.type('text/plain');
