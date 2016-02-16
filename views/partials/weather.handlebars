@@ -12,3 +12,16 @@
 	<small>Source: <a href="http://www.wunderground.com">Weather
 Underground</a></small>
 </div>
+
+{{#section 'head'}}
+	<!-- we want Google to ignore this page -->
+	<meta name="robots" content="noindex">
+{{/section}}
+
+{{#section 'jquery'}}
+	<script>
+		$('document').ready(function(){
+			$('h1').html('jQuery Works');
+		});
+	</script>
+{{/section}}
