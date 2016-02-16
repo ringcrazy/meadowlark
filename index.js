@@ -5,7 +5,7 @@ var app = express();
 
 // 模块名称前添加 ./表示根目录， ../ 表示上级目录
 var fortunes = require('./lib/fortune.js');
-var weather= require('./lib/weather.js');
+var weather = require('./lib/weather.js');
 
 app.set('port', process.env.PORT || 3000);
 
@@ -13,8 +13,8 @@ app.set('port', process.env.PORT || 3000);
 var handlebars = require('express3-handlebars').create({
     defaultLayout: 'main',
     helpers: {
-        section: function(name, options){
-            if(!this._sections) this._sections = {};
+        section: function(name, options) {
+            if (!this._sections) this._sections = {};
             this._sections[name] = options.fn(this);
             return null;
         }
@@ -36,8 +36,8 @@ app.use(function(req, res, next) {
 });
 
 // middleware to add weather data to context
-app.use(function(req, res, next){
-    if(!res.locals.partials) res.locals.partials = {};
+app.use(function(req, res, next) {
+    if (!res.locals.partials) res.locals.partials = {};
     res.locals.partials.weather = weather.getWeatherData();
     next();
 
@@ -47,77 +47,79 @@ app.use(function(req, res, next){
 // 使用中间件 body-parser
 app.use(require('body-parser')());
 
-app.get('/newsletter', function(req, res){
-    res.render('newsletter',{csrf:'CSRF token goes here'});
+app.get('/newsletter', function(req, res) {
+    res.render('newsletter', {
+        csrf: 'CSRF token goes here'
+    });
 });
-app.post('/process', function(req, res){
+app.post('/process', function(req, res) {
     console.log('Form (from querystring): ' + req.query.form);
-    console.log('CSRF token (from hidden form field): ' + req.body._csrf); 
-    console.log('Name (from visible form field): ' + req.body.name); 
+    console.log('CSRF token (from hidden form field): ' + req.body._csrf);
+    console.log('Name (from visible form field): ' + req.body.name);
     console.log('Email (from visible form field): ' + req.body.email);
     res.redirect(303, '/thank-you');
 });
 
-app.get('/thank-you', function(req, res){
-    res.render('thank-you');
+app.get('/thank-you', function(req, res) {
+            res.render('thank-you');});
 
 
 
-// 路由方法
-app.get('/', function(req, res) {
-    //res.type('text/plain');
-    //res.send('Meadowlark Travel');
+            // 路由方法
+            app.get('/', function(req, res) {
+                //res.type('text/plain');
+                //res.send('Meadowlark Travel');
 
-    res.render('home');
-});
-
-
-
-// 在路由中指明视图应该使用哪个页面测试文件
-app.get('/about', function(req, res) {
-    // res.type('text/plain');
-    // res.send('About Meadowlark Travel');
-
-    res.render('about', {
-        fortune: fortunes.getFortune(),
-        pageTestScript: '/qa/tests-about.js'
-    });
-});
-
-app.get('/tours/hood-river', function(req, res) {
-    res.render('tours/hood-river');
-});
-
-app.get('/tours/request-group-rate', function(req, res) {
-    res.render('tours/request-group-rate');
-});
-
-// 定制404页面, app.use是Express添加中间件的一种方法
-app.use(function(req, res) {
-    // res.type('text/plain');
-    // res.status(404);
-    // res.send('404- Not Found');
-    res.status(404);
-    res.render('404');
-});
-
-// 定制500页面
-app.use(function(err, req, res, next) {
-    // console.error(err.stack);
-    // res.type('text/plain');
-    // res.status(500);
-    // res.send('500 - Server Error');
-    console.error(err.stack);
-    res.status(500);
-    res.render('500');
-});
+                res.render('home');
+            });
 
 
 
-// if( app.thing == null ) console.log( 'bleat!' );
+            // 在路由中指明视图应该使用哪个页面测试文件
+            app.get('/about', function(req, res) {
+                // res.type('text/plain');
+                // res.send('About Meadowlark Travel');
 
-// 监听端口
-app.listen(app.get('port'), function() {
-    // console.log("hello world");
-    console.log('Express started on http://localhost:' + app.get('port') + ';press Ctrl - C to terminate.');
-});
+                res.render('about', {
+                    fortune: fortunes.getFortune(),
+                    pageTestScript: '/qa/tests-about.js'
+                });
+            });
+
+            app.get('/tours/hood-river', function(req, res) {
+                res.render('tours/hood-river');
+            });
+
+            app.get('/tours/request-group-rate', function(req, res) {
+                res.render('tours/request-group-rate');
+            });
+
+            // 定制404页面, app.use是Express添加中间件的一种方法
+            app.use(function(req, res) {
+                // res.type('text/plain');
+                // res.status(404);
+                // res.send('404- Not Found');
+                res.status(404);
+                res.render('404');
+            });
+
+            // 定制500页面
+            app.use(function(err, req, res, next) {
+                // console.error(err.stack);
+                // res.type('text/plain');
+                // res.status(500);
+                // res.send('500 - Server Error');
+                console.error(err.stack);
+                res.status(500);
+                res.render('500');
+            });
+
+
+
+            // if( app.thing == null ) console.log( 'bleat!' );
+
+            // 监听端口
+            app.listen(app.get('port'), function() {
+                // console.log("hello world");
+                console.log('Express started on http://localhost:' + app.get('port') + ';press Ctrl - C to terminate.');
+            });
