@@ -8,6 +8,7 @@ var app = express();
 // 模块名称前添加 ./表示根目录， ../ 表示上级目录
 var fortunes = require('./lib/fortune.js');
 var weather = require('./lib/weather.js');
+var credentials = require('./credentials.js');
 
 app.set('port', process.env.PORT || 3000);
 
@@ -62,7 +63,31 @@ app.use('/upload', function(req, res, next) {
     })(req, res, next);
 });
 
+// cookie
+app.use(require('cookie-parser')(credentials.cookieSecret));
+app.use(require('express-session')());
+
+// 如果有即显消息,把它传到上下文中,然后清除它
+app.use(function(req, res, next) {
+     res.locals.flash = req.session.flash;
+    delete req.session.flash;
+    next();
+});
+
 app.get('/newsletter', function(req, res) {
+    // 设置cookie
+    res.cookie('monster', 'nom nom');
+    res.cookie('abc', 'nom nom nom');
+    res.cookie('signed_monster', 'nom nom', {
+        signed: true
+    });
+
+    // session
+    req.session.userName = 'Anonymous';
+    var colorScheme = req.session.colorScheme || 'dark';
+
+    // 删除cookie
+    res.clearCookie('monster');
     res.render('newsletter', {
         csrf: 'CSRF token goes here'
     });
@@ -91,6 +116,51 @@ app.post('/processAjax', function(req, res) {
         // 如果发生错误,应该重定向到错误页面
         res.redirect(303, '/thank-you');
     }
+});
+
+// for now, we're mocking NewsletterSignup:
+function NewsletterSignup(){
+}
+NewsletterSignup.prototype.save = function(cb){
+    cb();
+};
+
+var VALID_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+app.post('/newsletter', function(req, res){
+    var name = req.body.name || '', email = req.body.email || '';
+    // input validation
+    if(!email.match(VALID_EMAIL_REGEX)) {
+        if(req.xhr) return res.json({ error: 'Invalid name email address.' });
+        req.session.flash = {
+            type: 'danger',
+            intro: 'Validation error!',
+            message: 'The email address you entered was  not valid.',
+        };
+        return res.redirect(303, '/newsletter/archive');
+    }
+    new NewsletterSignup({ name: name, email: email }).save(function(err){
+        if(err) {
+            if(req.xhr) return res.json({ error: 'Database error.' });
+            req.session.flash = {
+                type: 'danger',
+                intro: 'Database error!',
+                message: 'There was a database error; please try again later.',
+            };
+            return res.redirect(303, '/newsletter/archive');
+        }
+        if(req.xhr) return res.json({ success: true });
+        req.session.flash = {
+            type: 'success',
+            intro: 'Thank you!',
+            message: 'You have now been signed up for the newsletter.',
+        };
+        return res.redirect(303, '/newsletter/archive');
+    });
+});
+
+app.get('/newsletter/archive', function(req, res){
+    res.render('newsletter/archive');
 });
 
 app.get('/thank-you', function(req, res) {
