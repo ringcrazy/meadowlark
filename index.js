@@ -4,6 +4,82 @@ var express = require('express');
 var formidable = require('formidable');
 var jqupload = require('jquery-file-upload-middleware');
 var app = express();
+var nodemailer = require('nodemailer');
+
+var mailTransport = nodemailer.createTransport('SMTP', {
+    service: 'Gmail',
+    auth: {
+        user: credentials.gmail.user,
+        pass: credentials.gmail.password
+    }
+});
+
+// 数据库连接
+var mongoose = require('mongoose');
+var opts = {
+    server: {
+        socketOptions: {
+            keepAlive: 1
+        }
+    }
+};
+switch (app.get('env')) {
+    case 'development':
+        mongoose.connect(credentials.mongo.development.connectionString, opts);
+        break;
+    case 'production':
+        mongoose.connect(credentials.mongo.production.connectionString, opts);
+        break;
+    default:
+        throw new Error('Unknown execution environment:' + app.get('env'));
+}
+
+// 添加初始数据
+Vacation.find(function(err, vacations) {
+    if (vacations.length) return;
+    new Vacation({
+        name: 'Hood River Day Trip',
+        slug: 'hood-river-day-trip',
+        category: 'Day Trip',
+        sku: 'HR199',
+        description: 'Spend a day sailing on the Columbia and ' +
+            'enjoying craft beers in Hood River!',
+        priceInCents: 9995,
+        tags: ['day trip', 'hood river', 'sailing', 'windsurfing', 'breweries'],
+        inSeason: true,
+        maximumGuests: 16,
+        available: true,
+        packagesSold: 0,
+    }).save();
+    new Vacation({
+        name: 'Oregon Coast Getaway',
+        slug: 'oregon-coast-getaway',
+        category: 'Weekend Getaway',
+        sku: 'OC39',
+        description: 'Enjoy the ocean air and quaint coastal towns!',
+        priceInCents: 269995,
+        tags: ['weekend getaway', 'oregon coast', 'beachcombing'],
+        inSeason: false,
+        maximumGuests: 8,
+        available: true,
+        packagesSold: 0,
+    }).save();
+    new Vacation({
+        name: 'Rock Climbing in Bend',
+        slug: 'rock-climbing-in-bend',
+        category: 'Adventure',
+        sku: 'B99',
+        description: 'Experience the thrill of climbing in the high desert.',
+        priceInCents: 289995,
+        tags: ['weekend getaway', 'bend', 'high desert', 'rock climbing'],
+        inSeason: true,
+        requiresWaiver: true,
+        maximumGuests: 4,
+        available: false,
+        packagesSold: 0,
+        notes: 'The tour guide is currently recovering from a skiing accident.',
+    }).save();
+});
 
 // 模块名称前添加 ./表示根目录， ../ 表示上级目录
 var fortunes = require('./lib/fortune.js');
@@ -69,7 +145,7 @@ app.use(require('express-session')());
 
 // 如果有即显消息,把它传到上下文中,然后清除它
 app.use(function(req, res, next) {
-     res.locals.flash = req.session.flash;
+    res.locals.flash = req.session.flash;
     delete req.session.flash;
     next();
 });
@@ -119,19 +195,21 @@ app.post('/processAjax', function(req, res) {
 });
 
 // for now, we're mocking NewsletterSignup:
-function NewsletterSignup(){
-}
-NewsletterSignup.prototype.save = function(cb){
+function NewsletterSignup() {}
+NewsletterSignup.prototype.save = function(cb) {
     cb();
 };
 
 var VALID_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
-app.post('/newsletter', function(req, res){
-    var name = req.body.name || '', email = req.body.email || '';
+app.post('/newsletter', function(req, res) {
+    var name = req.body.name || '',
+        email = req.body.email || '';
     // input validation
-    if(!email.match(VALID_EMAIL_REGEX)) {
-        if(req.xhr) return res.json({ error: 'Invalid name email address.' });
+    if (!email.match(VALID_EMAIL_REGEX)) {
+        if (req.xhr) return res.json({
+            error: 'Invalid name email address.'
+        });
         req.session.flash = {
             type: 'danger',
             intro: 'Validation error!',
@@ -139,9 +217,14 @@ app.post('/newsletter', function(req, res){
         };
         return res.redirect(303, '/newsletter/archive');
     }
-    new NewsletterSignup({ name: name, email: email }).save(function(err){
-        if(err) {
-            if(req.xhr) return res.json({ error: 'Database error.' });
+    new NewsletterSignup({
+        name: name,
+        email: email
+    }).save(function(err) {
+        if (err) {
+            if (req.xhr) return res.json({
+                error: 'Database error.'
+            });
             req.session.flash = {
                 type: 'danger',
                 intro: 'Database error!',
@@ -149,7 +232,9 @@ app.post('/newsletter', function(req, res){
             };
             return res.redirect(303, '/newsletter/archive');
         }
-        if(req.xhr) return res.json({ success: true });
+        if (req.xhr) return res.json({
+            success: true
+        });
         req.session.flash = {
             type: 'success',
             intro: 'Thank you!',
@@ -159,7 +244,7 @@ app.post('/newsletter', function(req, res){
     });
 });
 
-app.get('/newsletter/archive', function(req, res){
+app.get('/newsletter/archive', function(req, res) {
     res.render('newsletter/archive');
 });
 
@@ -194,6 +279,42 @@ app.post('/contest/vacation-photo/:year/:month', function(req, res) {
         console.log('received files:');
         console.log(files);
         res.redirect(303, '/thank-you');
+    });
+});
+
+
+app.post('/cart/checkout', function(req, res) {
+    var cart = req.session.cart;
+    if (!cart) next(new Error('Cart does not exist.'));
+    var name = req.body.name || '',
+        email = req.body.email || ''; // 输入验证
+    if (!email.match(VALID_EMAIL_REGEX))
+        return res.next(new Error('Invalid email address.')); // 分配一个随机的购物车 ID;一般我们会用一个数据库 ID 
+    cart.number = Math.random().toString().replace(/^0\.0*/, '');
+    cart.billing = {
+        name: name,
+        email: email,
+    };
+
+    // 回调函数，防止视图的结果在浏览器上渲染
+    res.render('email/cart-thank-you', {
+        layout: null,
+        cart: cart
+    }, function(err, html) {
+        if (err) console.log('error in email template');
+        mailTransport.sendMail({
+            from: '"Meadowlark Travel": info@meadowlarktravel.com',
+            to: cart.billing.email,
+            subject: 'Thank You for Book your Trip with Meadowlark',
+            html: html,
+            generateTextFromHtml: true
+        }, function(err) {});
+    });
+    if (err) console.error('Unable to send confirmation: ' + err.stack);
+
+    // 这次结果会像往常一样将 HTML 响应发给浏览 器
+    res.render('cart-thank-you', {
+        cart: cart
     });
 });
 
